@@ -8,8 +8,9 @@ import {
   ParseIntPipe,
   UseGuards,
   Req,
+  Patch,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrderService } from './order.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -37,5 +38,12 @@ export class OrderController {
   @Get(':id')
   getOrderById(@Req() req: any, @Param('id', ParseIntPipe) orderId: number) {
     return this.orderService.getOrderById(req.user.id, orderId);
+  }
+  @Patch(':id/cancel')
+  @ApiOperation({
+    summary: 'Hủy đơn hàng (chỉ được hủy khi đang chờ thanh toán)',
+  })
+  cancelOrder(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    return this.orderService.cancelOrder(req.user.id, id);
   }
 }

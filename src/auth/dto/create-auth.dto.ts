@@ -59,3 +59,7 @@ export class RefreshTokenDto {
   @ApiProperty({ description: 'Refresh token nhận được khi đăng nhập' })
   refreshToken!: string;
 }
+export class ResendOtpDto {
+  @ApiProperty({ example: 'phi@webie.vn' })
+  email!: string;
+}

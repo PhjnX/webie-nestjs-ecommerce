@@ -14,6 +14,7 @@ import {
   LoginDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  ResendOtpDto,
 } from './dto/create-auth.dto';
 import { MailerService } from '@nestjs-modules/mailer';
 import * as bcrypt from 'bcrypt';
@@ -253,5 +254,49 @@ export class AuthService {
       success: true,
       message: 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.',
     };
+  }
+  async setAdmin(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) throw new BadRequestException('Email không tồn tại!');
+
+    user.role = 'admin';
+    await this.userRepository.save(user);
+
+    return { success: true, message: `Đã set role admin cho ${email}` };
+  }
+  async resendOtp(dto: ResendOtpDto) {
+    const { email } = dto;
+
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) throw new BadRequestException('Email không tồn tại!');
+    if (user.is_verified)
+      throw new BadRequestException('Tài khoản đã được xác thực rồi!');
+
+    // Sinh OTP mới
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiredAt = new Date();
+    expiredAt.setMinutes(expiredAt.getMinutes() + 5);
+
+    user.verification_code = otp;
+    user.code_expired_at = expiredAt;
+    await this.userRepository.save(user);
+
+    // Gửi lại email
+    await this.mailerService.sendMail({
+      to: email,
+      subject: '[Webie] Mã OTP Mới — Xác Thực Tài Khoản',
+      html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:25px;border:1px solid #e2e8f0;border-radius:16px;">
+        <h2 style="color:#C9A84C;text-align:center;">MÃ OTP MỚI CỦA BẠN</h2>
+        <p>Bạn vừa yêu cầu gửi lại mã OTP. Mã mới của bạn là:</p>
+        <div style="text-align:center;margin:35px 0;">
+          <span style="font-size:36px;font-weight:900;letter-spacing:6px;padding:14px 40px;border:2px dashed #C9A84C;border-radius:12px;">${otp}</span>
+        </div>
+        <p style="color:#ef4444;text-align:center;">⚠️ Mã có hiệu lực trong 5 phút, chỉ dùng 1 lần.</p>
+      </div>
+    `,
+    });
+
+    return { success: true, message: 'Đã gửi lại mã OTP mới về email!' };
   }
 }

@@ -63,10 +63,20 @@ export class OdooService {
         method: 'call',
         params: { model, method, args: [], kwargs },
       },
-      { headers: { Cookie: cookie } },
+      {
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+        },
+        responseType: 'arraybuffer', // ← nhận raw bytes
+      },
     );
 
-    return response.data.result;
+    // Decode UTF-8 từ raw bytes
+    const text = Buffer.from(response.data).toString('utf8');
+    const json = JSON.parse(text);
+
+    return json.result;
   }
 
   // ── HELPER: Chuyển Base64 thành URL ảnh Odoo ──────────────────────
@@ -77,7 +87,7 @@ export class OdooService {
   // ── GET ALL PRODUCTS — Danh sách sản phẩm ─────────────────────────
   async getProducts(limit = 20, offset = 0): Promise<any> {
     const result = await this.callOdoo('product.template', 'search_read', {
-      domain: [['sale_ok', '=', true]], // Chỉ lấy SP đang bán
+      domain: [], // ← Bỏ filter sale_ok để lấy tất cả SP
       fields: [
         'id',
         'name',
@@ -91,9 +101,15 @@ export class OdooService {
       offset,
     });
 
-    // Đếm tổng số sản phẩm để phân trang
+    console.log('Odoo raw result:', result); // ← Debug xem trả về gì
+
+    // ← Thêm check null
+    if (!result || !Array.isArray(result)) {
+      return { total: 0, limit, offset, data: [] };
+    }
+
     const total = await this.callOdoo('product.template', 'search_count', {
-      domain: [['sale_ok', '=', true]],
+      domain: [],
     });
 
     return {
@@ -110,7 +126,7 @@ export class OdooService {
           : null,
         sku: p.default_code || null,
         stock: p.qty_available || 0,
-        image_url: this.getImageUrl(p.id), // URL ảnh thay vì Base64
+        image_url: this.getImageUrl(p.id),
       })),
     };
   }

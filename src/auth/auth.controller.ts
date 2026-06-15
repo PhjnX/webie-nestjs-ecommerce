@@ -1,10 +1,18 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
 import {
   ApiOperation,
   ApiTags,
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
@@ -13,8 +21,17 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  ResendOtpDto,
 } from './dto/create-auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+
+class SetAdminDto {
+  @ApiProperty({ example: 'vietnamwebie@gmail.com' })
+  email!: string;
+
+  @ApiProperty({ example: 'webie-secret-2025' })
+  secretKey!: string;
+}
 
 @ApiTags('Authentication Module')
 @Controller('auth')
@@ -63,5 +80,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Đặt lại mật khẩu bằng OTP' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  // ⚠️ XÓA ROUTE NÀY SAU KHI DÙNG XONG!
+  @Post('set-admin')
+  @ApiOperation({ summary: '⚠️ Tạm thời — Set role admin (xóa sau khi dùng)' })
+  async setAdmin(@Body() body: SetAdminDto) {
+    if (body.secretKey !== 'webie-secret-2025') {
+      throw new BadRequestException('Secret key không hợp lệ!');
+    }
+    return this.authService.setAdmin(body.email);
+  }
+  @Post('resend-otp')
+  @ApiOperation({ summary: 'Gửi lại OTP khi hết hạn' })
+  resendOtp(@Body() dto: ResendOtpDto) {
+    return this.authService.resendOtp(dto);
   }
 }

@@ -11,6 +11,9 @@ import { MailerModule } from '@nestjs-modules/mailer'; // 🛠️ Thêm import n
 import { UserModule } from './user/user.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CartModule } from './cart/cart.module'; // thêm import
+import { PaymentModule } from './payment/payment.module';
+import { ContactModule } from './contact/contact.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -25,7 +28,7 @@ import { CartModule } from './cart/cart.module'; // thêm import
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_DATABASE,
-
+      charset: 'utf8mb4',
       // Tự động quét tìm tất cả các file có đuôi .entity.ts trong folder src
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
 
@@ -57,6 +60,10 @@ import { CartModule } from './cart/cart.module'; // thêm import
     CloudinaryModule,
 
     CartModule,
+
+    PaymentModule,
+    ContactModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
