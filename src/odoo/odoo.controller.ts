@@ -1,5 +1,13 @@
-import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  ParseIntPipe,
+  Res,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
+import express from 'express';
 import { OdooService } from './odoo.service';
 
 @ApiTags('Odoo — Sản phẩm & Danh mục')
@@ -36,6 +44,21 @@ export class OdooController {
     @Query('offset') offset = 0,
   ) {
     return this.odooService.getProductsByCategory(categoryId, +limit, +offset);
+  }
+
+  // GET /odoo/products/:id/image — Proxy ảnh sản phẩm qua session Odoo
+  // đã xác thực, vì browser người dùng cuối không có cookie để gọi
+  // trực tiếp link ảnh từ Odoo.
+  @Get('products/:id/image')
+  @ApiOperation({ summary: 'Lấy ảnh sản phẩm (proxy qua Odoo, có xác thực)' })
+  async getProductImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: express.Response,
+  ) {
+    const { buffer, contentType } = await this.odooService.getProductImage(id);
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
   }
 
   @Get('products/:id')

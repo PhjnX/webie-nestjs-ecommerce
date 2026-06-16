@@ -8,6 +8,10 @@ export class OdooService {
   private readonly login = process.env.ODOO_LOGIN;
   private readonly password = process.env.ODOO_PASS;
 
+  // URL public của chính backend bạn (vd: https://coral-mouse-470858.hostingersite.com)
+  // dùng để build link ảnh proxy thay vì trả link Odoo trực tiếp
+  private readonly backendUrl = process.env.BACKEND_PUBLIC_URL || '';
+
   private cachedCookie: string | null = null;
   private cookieExpiredAt: Date | null = null;
 
@@ -127,9 +131,33 @@ export class OdooService {
     return json.result;
   }
 
-  // ── HELPER: Chuyển Base64 thành URL ảnh Odoo ──────────────────────
+  // ── HELPER: Lấy ảnh sản phẩm trực tiếp từ Odoo (có xác thực) ──────
+  // Dùng để proxy qua endpoint riêng của backend, vì người dùng cuối
+  // (browser) không có session cookie của Odoo, nếu gọi thẳng link Odoo
+  // mà sản phẩm chưa publish lên web thì Odoo trả về ảnh placeholder
+  // mặc định giống nhau cho mọi sản phẩm.
+  async getProductImage(
+    productId: number,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const cookie = await this.authenticate();
+
+    const response = await this.http.get(
+      `/web/image/product.template/${productId}/image_1920`,
+      {
+        headers: { Cookie: cookie },
+        responseType: 'arraybuffer',
+      },
+    );
+
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: String(response.headers['content-type'] || 'image/png'),
+    };
+  }
+
+  // ── HELPER: Build URL ảnh trỏ về proxy của chính backend ──────────
   private getImageUrl(productId: number): string {
-    return `${this.url}/web/image/product.template/${productId}/image_1920`;
+    return `${this.backendUrl}/odoo/products/${productId}/image`;
   }
 
   // ── GET ALL PRODUCTS — Danh sách sản phẩm ─────────────────────────
