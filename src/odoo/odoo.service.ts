@@ -27,6 +27,13 @@ export class OdooService {
       return this.cachedCookie;
     }
 
+    // Kiểm tra config trước khi gọi, tránh lỗi khó hiểu phía sau
+    if (!this.url || !this.db || !this.login || !this.password) {
+      throw new Error(
+        `Thiếu biến môi trường Odoo. ODOO_URL=${this.url}, ODOO_DB=${this.db}, ODOO_LOGIN=${this.login}, ODOO_PASS=${this.password ? '(đã set)' : '(thiếu)'}`,
+      );
+    }
+
     const response = await this.http.post('/web/session/authenticate', {
       jsonrpc: '2.0',
       method: 'call',
@@ -37,8 +44,21 @@ export class OdooService {
       },
     });
 
+    // Log để debug khi cần — có thể xoá sau khi đã xác nhận chạy ổn
+    console.log('[Odoo] AUTH RESPONSE:', JSON.stringify(response.data));
+    console.log('[Odoo] AUTH SET-COOKIE:', response.headers['set-cookie']);
+
     const cookies = response.headers['set-cookie'];
-    this.cachedCookie = cookies ? cookies[0] : '';
+
+    // Odoo trả result = false/null hoặc không có cookie => login thất bại
+    // KHÔNG cache cookie rỗng/sai, tránh kẹt lỗi 30 phút
+    if (!cookies || !cookies[0] || !response.data?.result) {
+      throw new Error(
+        `[Odoo] Authenticate thất bại. Response: ${JSON.stringify(response.data)}`,
+      );
+    }
+
+    this.cachedCookie = cookies[0];
 
     // Cache cookie 30 phút
     const expired = new Date();
@@ -74,7 +94,35 @@ export class OdooService {
 
     // Decode UTF-8 từ raw bytes
     const text = Buffer.from(response.data).toString('utf8');
+
+    // Nếu Odoo (hoặc proxy/hosting ở giữa) trả về HTML thay vì JSON,
+    // báo lỗi rõ ràng kèm nội dung thật để debug, thay vì để JSON.parse
+    // nổ với thông báo mơ hồ "Unexpected token '<'"
+    if (text.trim().startsWith('<')) {
+      console.error(
+        '[Odoo] callOdoo nhận về HTML thay vì JSON. Nội dung (500 ký tự đầu):',
+        text.slice(0, 500),
+      );
+
+      // Cookie có thể đã hết hạn phía Odoo dù chưa hết hạn cache local
+      // => xoá cache để lần gọi sau authenticate lại từ đầu
+      this.cachedCookie = null;
+      this.cookieExpiredAt = null;
+
+      throw new Error(
+        'Odoo trả về HTML thay vì JSON (có thể session hết hạn, sai URL, hoặc bị chặn bởi proxy/hosting). Xem log phía trên để biết nội dung thực tế.',
+      );
+    }
+
     const json = JSON.parse(text);
+
+    // Odoo có thể trả JSON hợp lệ nhưng chứa lỗi (vd permission, model sai...)
+    if (json.error) {
+      console.error('[Odoo] call_kw trả lỗi:', JSON.stringify(json.error));
+      throw new Error(
+        `Odoo error: ${json.error.message || JSON.stringify(json.error)}`,
+      );
+    }
 
     return json.result;
   }
