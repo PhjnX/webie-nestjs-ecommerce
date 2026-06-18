@@ -7,7 +7,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
-import express from 'express';
+import type { Response } from 'express';
 import { OdooService } from './odoo.service';
 
 @ApiTags('Odoo — Sản phẩm & Danh mục')
@@ -46,14 +46,12 @@ export class OdooController {
     return this.odooService.getProductsByCategory(categoryId, +limit, +offset);
   }
 
-  // GET /odoo/products/:id/image — Proxy ảnh sản phẩm qua session Odoo
-  // đã xác thực, vì browser người dùng cuối không có cookie để gọi
-  // trực tiếp link ảnh từ Odoo.
+  // ✅ Các route có sub-path (/:id/image, /:id/stock) phải đặt TRƯỚC /:id
   @Get('products/:id/image')
   @ApiOperation({ summary: 'Lấy ảnh sản phẩm (proxy qua Odoo, có xác thực)' })
   async getProductImage(
     @Param('id', ParseIntPipe) id: number,
-    @Res() res: express.Response,
+    @Res() res: Response,
   ) {
     const { buffer, contentType } = await this.odooService.getProductImage(id);
     res.set('Content-Type', contentType);
@@ -61,6 +59,13 @@ export class OdooController {
     res.send(buffer);
   }
 
+  @Get('products/:id/stock')
+  @ApiOperation({ summary: 'Kiểm tra tồn kho sản phẩm' })
+  checkStock(@Param('id', ParseIntPipe) id: number) {
+    return this.odooService.checkStock(id);
+  }
+
+  // ✅ Route dynamic /:id để CUỐI CÙNG trong nhóm products
   @Get('products/:id')
   @ApiOperation({ summary: 'Chi tiết 1 sản phẩm' })
   getProductById(@Param('id', ParseIntPipe) id: number) {
@@ -71,11 +76,5 @@ export class OdooController {
   @ApiOperation({ summary: 'Danh sách danh mục sản phẩm' })
   getCategories() {
     return this.odooService.getCategories();
-  }
-
-  @Get('products/:id/stock')
-  @ApiOperation({ summary: 'Kiểm tra tồn kho sản phẩm' })
-  checkStock(@Param('id', ParseIntPipe) id: number) {
-    return this.odooService.checkStock(id);
   }
 }
